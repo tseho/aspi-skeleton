@@ -1,0 +1,11 @@
+.git/
+.idea/
+.editorconfig
+.gitignore
+
+# Symfony
+/var/
+/vendor/
+/.env.local
+/.env.local.php
+/.env.*.local
