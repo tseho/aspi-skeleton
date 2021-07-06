@@ -1,0 +1,8 @@
+.git/
+.idea/
+.editorconfig
+.gitignore
+
+# node
+/build/
+/node_modules/
