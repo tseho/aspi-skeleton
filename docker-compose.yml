@@ -1,0 +1,105 @@
+version: "3.7"
+
+services:
+    apache:
+        build:
+            context: ./back
+            target: apache
+            args:
+                BUILD_ENV: "${BUILD_ENV:-dev}"
+                USER: "${DOCKER_UID:-1000}"
+        environment:
+            - APP_ENV=${APP_ENV:-dev}
+            - PHP_XDEBUG_ENABLED=${PHP_XDEBUG_ENABLED:-0}
+            - PHP_XDEBUG_PORT=${PHP_XDEBUG_PORT:-9001}
+            - PHP_XDEBUG_REMOTE_HOST=${PHP_XDEBUG_REMOTE_HOST:-172.17.0.1}
+            - PHP_IDE_CONFIG=serverName=docker-php-server
+            - XDEBUG_CONFIG=idekey=docker-php-server
+        volumes:
+            - "./back:/srv/app:rw"
+        user: "${DOCKER_UID:-1000}"
+        restart: unless-stopped
+        ports:
+            - "${DOCKER_PORT_API:-8080}:8080"
+        depends_on:
+            postgresql: { condition: service_healthy }
+        networks:
+            - default
+
+    php:
+        build:
+            context: ./back
+            target: php
+            args:
+                BUILD_ENV: "${BUILD_ENV:-dev}"
+                USER: "${DOCKER_UID:-1000}"
+        environment:
+            - APP_ENV=${APP_ENV:-dev}
+            - PHP_XDEBUG_ENABLED=${PHP_XDEBUG_ENABLED:-0}
+            - PHP_XDEBUG_PORT=${PHP_XDEBUG_PORT:-9001}
+            - PHP_XDEBUG_REMOTE_HOST=${PHP_XDEBUG_REMOTE_HOST:-172.17.0.1}
+            - PHP_IDE_CONFIG=serverName=docker-php-cli
+            - XDEBUG_CONFIG=idekey=docker-php-cli
+        volumes:
+            - "./back:/srv/app:rw"
+        user: "${DOCKER_UID:-1000}"
+        restart: "no"
+        init: true
+        scale: 0
+        depends_on:
+            postgresql: { condition: service_healthy }
+        networks:
+            - default
+
+    postgresql:
+        image: postgres:13
+        environment:
+            - POSTGRES_USER=${POSTGRES_USER:-docker}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-docker}
+        restart: unless-stopped
+        healthcheck:
+            test: [ "CMD", "psql", "--username=${POSTGRES_USER:-docker}", "--no-password", "-c", '\l' ]
+            start_period: 20s
+            interval: 1s
+            retries: 10
+        volumes:
+            - "dbdata:/var/lib/postgresql/data"
+        ports:
+            - "${DOCKER_PORT_POSTGRES:-5432}:5432"
+        networks:
+            - default
+
+    composer:
+        build:
+            context: ./back
+            target: composer
+        working_dir: /srv/app
+        volumes:
+            - "./back:/srv/app:rw"
+            - "${COMPOSER_HOME:-~/.composer}:/tmp"
+        user: "${DOCKER_UID:-1000}"
+        restart: "no"
+        scale: 0
+
+    node:
+        build:
+            context: ./front
+            target: app
+            args:
+                BUILD_ENV: "${BUILD_ENV:-dev}"
+        command: "yarn start"
+        working_dir: /srv/app
+        user: "${DOCKER_UID:-1000}"
+        environment:
+            - API_BASEURL=${API_BASEURL:-http://localhost:8080}
+        ports:
+            - "${DOCKER_PORT_NODE:-3000}:3000"
+        volumes:
+            - "./front:/srv/app:rw"
+            - "${YARN_CACHE_FOLDER:-~/.cache/yarn}:/home/node/.cache/yarn"
+
+networks:
+    default: ~
+
+volumes:
+    dbdata: ~
