@@ -90,8 +90,9 @@ services:
         command: "yarn start"
         working_dir: /srv/app
         user: "${DOCKER_UID:-1000}"
+        restart: unless-stopped
         environment:
-            - API_BASEURL=${API_BASEURL:-http://localhost:8080}
+            - REACT_APP_API_BASEURL=${API_BASEURL:-http://localhost:8080}
         ports:
             - "${DOCKER_PORT_NODE:-3000}:3000"
         volumes:

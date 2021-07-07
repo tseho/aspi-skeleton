@@ -1,23 +1,20 @@
 import React from 'react';
+import { useQuery } from 'react-query';
 import logo from './logo.svg';
 import './App.css';
 
 function App() {
+  const { isLoading, data } = useQuery('message', () =>
+    fetch(process.env.REACT_APP_API_BASEURL + '/hello')
+      .then(res => res.json())
+  );
   return (
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
         <p>
-          Edit <code>src/App.tsx</code> and save to reload.
+          {isLoading ? 'Loading ...' : data?.message || 'Failed'}
         </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React 1
-        </a>
       </header>
     </div>
   );
