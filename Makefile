@@ -17,8 +17,15 @@ DOCKER_PORT_API ?= 8080
 DOCKER_PORT_NODE ?= 3000
 API_BASEURL ?= http://localhost:${DOCKER_PORT_API}
 
+ifeq ($(ENV), prod)
+	COMPOSER_ARGS += --no-dev
+	YARN_ARGS += --prod
+endif
+
 # Binaries
 DOCKER_COMPOSE = docker-compose
+COMPOSER = $(DOCKER_COMPOSE) run --rm --no-deps composer $(COMPOSER_ARGS)
+YARN = $(DOCKER_COMPOSE) run --rm --no-deps node yarn $(YARN_ARGS)
 
 # Export all variables so they are accessible in the shells created by make
 export
@@ -30,7 +37,7 @@ export
 .DEFAULT_GOAL := up
 
 .PHONY: up
-up: docker-compose-up
+up: docker-compose-build depencencies docker-compose-up
 	@echo "\e[30m\e[42m\n"
 	@echo " Application is up and running at http://localhost:$(DOCKER_PORT_NODE)"
 	@echo "\e[49m\e[39m\n"
@@ -44,7 +51,7 @@ down: docker-compose-down
 
 .PHONY: docker-compose-up
 docker-compose-up:
-	$(DOCKER_COMPOSE) up -d --remove-orphan --build
+	$(DOCKER_COMPOSE) up -d --remove-orphan
 
 .PHONY: docker-compose-stop
 docker-compose-stop:
@@ -57,3 +64,24 @@ docker-compose-down:
 .PHONY: docker-compose-build
 docker-compose-build:
 	$(DOCKER_COMPOSE) build
+
+##
+## Dependencies
+##
+
+.PHONY: dependencies
+depencencies: back/vendor front/node_modules
+
+back/vendor:
+	$(COMPOSER) install \
+		--no-scripts \
+		--no-interaction \
+		--no-ansi \
+		--prefer-dist \
+		--optimize-autoloader
+
+front/node_modules:
+	$(YARN) install \
+		--frozen-lockfile \
+		--no-progress \
+		--non-interactive
