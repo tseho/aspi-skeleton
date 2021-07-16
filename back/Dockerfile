@@ -1,4 +1,38 @@
-FROM php:8-cli AS composer
+FROM php:8-apache AS runtime
+
+ARG BUILD_ENV=prod
+ARG USER=www-data
+
+RUN apt-get update && \
+    apt-get install -y \
+        libicu-dev \
+        libonig-dev \
+        libpq-dev && \
+    docker-php-ext-install \
+        bcmath \
+        intl \
+        pdo_pgsql && \
+    mv /etc/apache2/mods-available/rewrite.load /etc/apache2/mods-enabled/rewrite.load && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN if [ "$BUILD_ENV" = "dev" ] || [ "$BUILD_ENV" = "test" ]; then \
+    pecl install \
+        xdebug && \
+    docker-php-ext-enable \
+        xdebug \
+    ; fi
+
+RUN mkdir /srv/app && chown $USER /srv/app
+WORKDIR /srv/app
+
+COPY ./docker/apache/apache2.conf /etc/apache2/apache2.conf
+COPY ./docker/apache/ports.conf /etc/apache2/ports.conf
+COPY ./docker/apache/app.conf /etc/apache2/sites-available/000-default.conf
+
+###############################################################################
+
+FROM runtime AS composer
 
 ENV COMPOSER_HOME=/tmp
 
@@ -6,7 +40,9 @@ RUN apt-get update && \
     apt-get install -y \
         git \
         unzip \
-        curl
+        curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=composer:2.1 /usr/bin/composer /usr/bin/composer
 COPY ./docker/composer/php.ini /usr/local/etc/php/conf.d/custom.ini
@@ -35,71 +71,28 @@ RUN if [ "$BUILD_ENV" = "prod" ]; then export COMPOSER_ARGS=--no-dev; fi; \
 
 ###############################################################################
 
-FROM php:8-apache AS apache
+FROM runtime AS apache
 
-ARG BUILD_ENV=prod
 ARG USER=www-data
 
-RUN apt-get update && \
-    apt-get install -y \
-        libicu-dev \
-        libonig-dev \
-        libpq-dev && \
-    docker-php-ext-install \
-        bcmath \
-        intl \
-        pdo_pgsql && \
-    mv /etc/apache2/mods-available/rewrite.load /etc/apache2/mods-enabled/rewrite.load && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN if [ "$BUILD_ENV" = "dev" ] || [ "$BUILD_ENV" = "test" ]; then \
-    pecl install \
-        xdebug && \
-    docker-php-ext-enable \
-        xdebug \
-    ; fi
-
-COPY ./docker/apache/apache2.conf /etc/apache2/apache2.conf
-COPY ./docker/apache/ports.conf /etc/apache2/ports.conf
-COPY ./docker/apache/app.conf /etc/apache2/sites-available/000-default.conf
-
-RUN mkdir /srv/app && chown $USER /srv/app
-USER $USER
 WORKDIR /srv/app
+
+USER $USER
 
 COPY . .
 COPY --from=vendors /srv/app/vendor vendor
 
 ###############################################################################
 
-FROM php:8-cli AS php
+FROM runtime AS cli
 
-ARG BUILD_ENV=prod
 ARG USER=www-data
 
-RUN apt-get update && \
-    apt-get install -y \
-        libicu-dev \
-        libonig-dev \
-        libpq-dev && \
-    docker-php-ext-install \
-        bcmath \
-        intl \
-        pdo_pgsql && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN if [ "$BUILD_ENV" = "dev" ] || [ "$BUILD_ENV" = "test" ]; then \
-    pecl install \
-        xdebug && \
-    docker-php-ext-enable \
-        xdebug \
-    ; fi
-
-RUN mkdir /srv/app && chown $USER /srv/app
-USER $USER
 WORKDIR /srv/app
+
+USER $USER
 
 COPY . .
 COPY --from=vendors /srv/app/vendor vendor
+
+CMD ["php", "-a"]

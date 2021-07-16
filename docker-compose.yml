@@ -4,7 +4,7 @@ services:
     apache:
         build:
             context: ./back
-            target: apache
+            target: runtime
             args:
                 BUILD_ENV: "${BUILD_ENV:-dev}"
                 USER: "${DOCKER_UID:-1000}"
@@ -29,7 +29,7 @@ services:
     php:
         build:
             context: ./back
-            target: php
+            target: runtime
             args:
                 BUILD_ENV: "${BUILD_ENV:-dev}"
                 USER: "${DOCKER_UID:-1000}"
@@ -84,9 +84,7 @@ services:
     node:
         build:
             context: ./front
-            target: app
-            args:
-                BUILD_ENV: "${BUILD_ENV:-dev}"
+            target: runtime
         command: "yarn start"
         working_dir: /srv/app
         user: "${DOCKER_UID:-1000}"

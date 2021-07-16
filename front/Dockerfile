@@ -1,33 +1,38 @@
-FROM node:16-slim AS vendors
+FROM node:16-slim AS runtime
+
+###############################################################################
+
+FROM runtime AS vendors
 
 ARG BUILD_ENV=prod
 
 WORKDIR /srv/app
-
+RUN mkdir /srv/app/node_modules
 COPY package.json yarn.lock ./
 
-RUN yarn install \
+RUN if [ "$BUILD_ENV" = "prod" ]; then export YARN_ARGS=--prod; fi; \
+    yarn install \
         --frozen-lockfile \
         --no-progress \
         --non-interactive \
-        --prod
+        ${YARN_ARGS}
 
 ###############################################################################
 
-FROM node:16-slim AS builder
+FROM runtime AS builder
+
+ARG REACT_APP_API_BASEURL=http://localhost:8080
 
 WORKDIR /srv/app
 
+COPY . .
 COPY --from=vendors /srv/app/node_modules node_modules
-COPY public public
-COPY src src
-COPY package.json tsconfig.json ./
 
 RUN yarn build
 
 ###############################################################################
 
-FROM node:16-slim AS app
+FROM runtime AS app
 
 WORKDIR /srv/app
 
